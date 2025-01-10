@@ -26,6 +26,17 @@ jobs:
       - name: Fetch domains
         run: node index.js
         
+      - name: Save output
+        run: |
+          mkdir -p ./data
+          mv blocked_domains.txt ./data/
+          
+      - name: Create artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: blocked-domains
+          path: ./data/blocked_domains.txt
+          
       - name: Configure Git
         run: |
           git config user.name "GitHub Action"
@@ -33,10 +44,10 @@ jobs:
           
       - name: Commit and push if changed
         run: |
-          git add blocked_domains.txt
+          git add .
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "Update blocked domains list [skip ci]"
+            git commit -m "Update [skip ci]"
             git push
           fi
