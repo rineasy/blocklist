@@ -27,13 +27,23 @@ jobs:
         run: mkdir -p ./data
         
       - name: Fetch domains
-        run: node index.js
+        run: |
+          node index.js
+          ls -la  # List all files to debug
+          echo "Content preview:"
+          if [ -f "blocked_domains.txt" ]; then
+            head -n 5 blocked_domains.txt
+          else
+            echo "blocked_domains.txt not found!"
+          fi
         
       - name: Create artifact
+        if: success() && hashFiles('blocked_domains.txt') != ''
         uses: actions/upload-artifact@v3
         with:
           name: blocked-domains
           path: blocked_domains.txt
+          retention-days: 1
           
       - name: Configure Git
         run: |
