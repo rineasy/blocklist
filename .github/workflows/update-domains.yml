@@ -2,7 +2,7 @@ name: Update Domain List
 
 on:
   schedule:
-    - cron: '*/40 * * * *'  # Runs every 40 minutes
+    - cron: '*/30 * * * *'  # Runs every 30 minutes
   workflow_dispatch:  # Allows manual trigger
 
 jobs:
