@@ -10,10 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     
     env:
-      URLS: |
-        https://trustpositif.kominfo.go.id/downloaddb/domains
-        https://trustpositif.kominfo.go.id/database/domains
-        https://trustpositif.kominfo.go.id/assets/db/domains
+      DOMAIN_URL: "https://trustpositif.kominfo.go.id/assets/db/domains"
       
     steps:
       - name: Checkout code
@@ -25,47 +22,29 @@ jobs:
         run: |
           now=$(date +"%Y-%m-%d_%H-%M-%S")
           echo "Fetching domains at $now"
+          echo "URL: $DOMAIN_URL"
           
-          # Create data directory
-          mkdir -p data
+          # Fetch domains with better options
+          curl --insecure \
+               --connect-timeout 10 \
+               --max-time 60 \
+               --retry 3 \
+               --retry-delay 5 \
+               --retry-max-time 60 \
+               -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0" \
+               -H "Accept: text/plain,text/html,*/*" \
+               -o blocked_domains.txt \
+               -L \
+               "$DOMAIN_URL"
           
-          # Try each URL
-          echo "$URLS" | while read -r url; do
-            if [ -z "$url" ]; then
-              continue
-            fi
-            
-            echo "Trying URL: $url"
-            
-            # Fetch domains with better options
-            if curl --insecure \
-                   --connect-timeout 10 \
-                   --max-time 60 \
-                   --retry 3 \
-                   --retry-delay 5 \
-                   --retry-max-time 60 \
-                   -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0" \
-                   -H "Accept: text/plain,text/html,*/*" \
-                   -o blocked_domains.txt \
-                   -L \
-                   "$url"; then
-              
-              if [ -s blocked_domains.txt ]; then
-                echo "Download successful from $url"
-                echo "Sample of first 5 domains:"
-                head -n 5 blocked_domains.txt
-                exit 0
-              else
-                echo "Downloaded file is empty, trying next URL"
-                continue
-              fi
-            else
-              echo "Failed to download from $url, trying next URL"
-            fi
-          done
-          
-          echo "All URLs failed"
-          exit 1
+          if [ -s blocked_domains.txt ]; then
+            echo "Download successful"
+            echo "Sample of first 5 domains:"
+            head -n 5 blocked_domains.txt
+          else
+            echo "Failed to download domains"
+            exit 1
+          fi
       
       - name: Create artifact
         if: success()
