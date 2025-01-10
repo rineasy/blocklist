@@ -10,22 +10,18 @@ jobs:
     runs-on: ubuntu-latest
     
     env:
-      DOMAIN_URL: ${{ secrets.SOURCE_URL }}
+      DOMAIN_URL: "https://trustpositif.kominfo.go.id/assets/db/domains"
       
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Setup WireGuard
+      
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y wireguard resolvconf
-          echo "${{ secrets.WIREGUARD_CONFIG }}" > wg0.conf
-          sudo mv wg0.conf /etc/wireguard/wg0.conf
-          sudo wg-quick up wg0
-        continue-on-error: false
+          sudo apt-get install -y curl
       
       - name: Fetch domains
         run: |
@@ -33,7 +29,7 @@ jobs:
           echo "Fetching domains at $now"
           echo "URL: $DOMAIN_URL"
           
-          # Fetch domains with better options
+          # Fetch domains
           curl --insecure \
                --connect-timeout 30 \
                --max-time 120 \
@@ -50,16 +46,12 @@ jobs:
             echo "Download successful"
             echo "Sample of first 5 domains:"
             head -n 5 blocked_domains.txt
+            echo "Total domains:"
+            wc -l blocked_domains.txt
           else
             echo "Failed to download domains"
             exit 1
           fi
-
-      - name: KillWireGuard
-        if: always()
-        run: |
-          sudo wg-quick down wg0
-        continue-on-error: true
       
       - name: Create artifact
         if: success()
