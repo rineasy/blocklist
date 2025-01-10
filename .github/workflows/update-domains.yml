@@ -9,53 +9,63 @@ jobs:
   update-list:
     runs-on: ubuntu-latest
     
+    env:
+      DOMAIN_URL: https://trustpositif.kominfo.go.id/assets/db/domains
+      
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
-      - name: Install dependencies
-        run: npm install
-      
-      - name: Create data directory
-        run: mkdir -p ./data
-        
       - name: Fetch domains
         run: |
-          node index.js
-          ls -la  # List all files to debug
-          echo "Content preview:"
-          if [ -f "blocked_domains.txt" ]; then
+          now=$(date +"%Y-%m-%d_%H-%M-%S")
+          echo "Fetching domains at $now"
+          
+          # Create data directory
+          mkdir -p data
+          
+          # Fetch domains with retry
+          for i in {1..3}; do
+            if curl --insecure -m 300 -o "blocked_domains.txt" "$DOMAIN_URL"; then
+              echo "Download successful"
+              break
+            else
+              echo "Attempt $i failed, retrying in 5 seconds..."
+              sleep 5
+            fi
+          done
+          
+          # Check if file exists and has content
+          if [ -s blocked_domains.txt ]; then
+            echo "File downloaded successfully"
+            echo "Sample of first 5 domains:"
             head -n 5 blocked_domains.txt
           else
-            echo "blocked_domains.txt not found!"
+            echo "Failed to download domains"
+            exit 1
           fi
-        
+      
       - name: Create artifact
-        if: success() && hashFiles('blocked_domains.txt') != ''
+        if: success()
         uses: actions/upload-artifact@v3
         with:
           name: blocked-domains
           path: blocked_domains.txt
           retention-days: 1
-          
+      
       - name: Configure Git
         run: |
-          git config user.name "GitHub Action"
-          git config user.email "action@github.com"
-          
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      
       - name: Commit and push if changed
         run: |
-          git add .
-          if git diff --staged --quiet; then
+          if git diff --quiet blocked_domains.txt; then
             echo "No changes to commit"
           else
-            git commit -m "Update [skip ci]"
+            git add blocked_domains.txt
+            git commit -m "Update blocked domains [skip ci]"
             git push
           fi
