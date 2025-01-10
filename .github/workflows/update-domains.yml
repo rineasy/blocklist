@@ -23,19 +23,17 @@ jobs:
       - name: Install dependencies
         run: npm install
       
+      - name: Create data directory
+        run: mkdir -p ./data
+        
       - name: Fetch domains
         run: node index.js
         
-      - name: Save output
-        run: |
-          mkdir -p ./data
-          mv blocked_domains.txt ./data/
-          
       - name: Create artifact
         uses: actions/upload-artifact@v3
         with:
           name: blocked-domains
-          path: ./data/blocked_domains.txt
+          path: blocked_domains.txt
           
       - name: Configure Git
         run: |
