@@ -10,7 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     
     env:
-      DOMAIN_URL: https://trustpositif.kominfo.go.id/assets/db/domains
+      URLS: |
+        https://trustpositif.kominfo.go.id/downloaddb/domains
+        https://trustpositif.kominfo.go.id/database/domains
+        https://trustpositif.kominfo.go.id/assets/db/domains
       
     steps:
       - name: Checkout code
@@ -26,26 +29,43 @@ jobs:
           # Create data directory
           mkdir -p data
           
-          # Fetch domains with retry
-          for i in {1..3}; do
-            if curl --insecure -m 300 -o "blocked_domains.txt" "$DOMAIN_URL"; then
-              echo "Download successful"
-              break
+          # Try each URL
+          echo "$URLS" | while read -r url; do
+            if [ -z "$url" ]; then
+              continue
+            fi
+            
+            echo "Trying URL: $url"
+            
+            # Fetch domains with better options
+            if curl --insecure \
+                   --connect-timeout 10 \
+                   --max-time 60 \
+                   --retry 3 \
+                   --retry-delay 5 \
+                   --retry-max-time 60 \
+                   -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0" \
+                   -H "Accept: text/plain,text/html,*/*" \
+                   -o blocked_domains.txt \
+                   -L \
+                   "$url"; then
+              
+              if [ -s blocked_domains.txt ]; then
+                echo "Download successful from $url"
+                echo "Sample of first 5 domains:"
+                head -n 5 blocked_domains.txt
+                exit 0
+              else
+                echo "Downloaded file is empty, trying next URL"
+                continue
+              fi
             else
-              echo "Attempt $i failed, retrying in 5 seconds..."
-              sleep 5
+              echo "Failed to download from $url, trying next URL"
             fi
           done
           
-          # Check if file exists and has content
-          if [ -s blocked_domains.txt ]; then
-            echo "File downloaded successfully"
-            echo "Sample of first 5 domains:"
-            head -n 5 blocked_domains.txt
-          else
-            echo "Failed to download domains"
-            exit 1
-          fi
+          echo "All URLs failed"
+          exit 1
       
       - name: Create artifact
         if: success()
@@ -56,11 +76,13 @@ jobs:
           retention-days: 1
       
       - name: Configure Git
+        if: success()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
       
       - name: Commit and push if changed
+        if: success()
         run: |
           if git diff --quiet blocked_domains.txt; then
             echo "No changes to commit"
